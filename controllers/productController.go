@@ -5,6 +5,10 @@ import (
 	db "github.com/FelipeGeraldoblufus/product-microservice-go/config"
 	"github.com/FelipeGeraldoblufus/product-microservice-go/models"
 	"gorm.io/gorm"
+
+	"fmt"
+	"math/rand"
+	"time"
 )
 
 func CreateUser(username string) (*models.User, error) {
@@ -44,7 +48,24 @@ func GetByUser(username string) (models.User, error) {
 	return users, err
 }
 
-func UpdateProduct(productoIngresado string, newnameProduct string) (models.Product, error) {
+// Función para obtener un producto por su ID
+func GetByProductID(productID string) (models.Product, error) {
+    var product models.Product
+
+    // Buscar el producto por su product_id en la base de datos
+    if err := db.DB.Where("product_id = ?", productID).First(&product).Error; err != nil {
+        if err == gorm.ErrRecordNotFound {
+            // Si no se encuentra el producto
+            return models.Product{}, errors.New("product not found")
+        }
+        return models.Product{}, err
+    }
+
+    // Devolver el producto encontrado
+    return product, nil
+}
+
+func UpdateProduct(productoIngresado string, newName string, newPrice int, newStock int, newDescription string, newCategory string) (models.Product, error) {
 	// Inicia una transacción
 	tx := db.DB.Begin()
 	defer func() {
@@ -62,9 +83,9 @@ func UpdateProduct(productoIngresado string, newnameProduct string) (models.Prod
 	}
 
 	// Verifica si el nombre está siendo cambiado y si existe otro producto con el mismo nombre
-	if productoIngresado != newnameProduct {
+	if producto.Name != newName {
 		var duplicateProduct models.Product
-		if err := tx.Where("name = ?", newnameProduct).First(&duplicateProduct).Error; err == nil {
+		if err := tx.Where("name = ?", newName).First(&duplicateProduct).Error; err == nil {
 			// Ya existe un producto con el nuevo nombre
 			tx.Rollback()
 			return producto, errors.New("product with the same name already exists")
@@ -76,8 +97,21 @@ func UpdateProduct(productoIngresado string, newnameProduct string) (models.Prod
 	}
 
 	// Actualiza los campos del producto existente con los nuevos valores
-	producto.Name = newnameProduct
-	// Puedes agregar más campos según sea necesario
+	if newName != "" {
+		producto.Name = newName
+	}
+	if newPrice > 0 {
+		producto.Price = newPrice
+	}
+	if newStock >= 0 {
+		producto.Stock = newStock
+	}
+	if newDescription != "" {
+		producto.Description = newDescription
+	}
+	if newCategory != "" {
+		producto.Category = newCategory
+	}
 
 	// Guarda los cambios en la base de datos
 	if err := tx.Save(&producto).Error; err != nil {
@@ -89,23 +123,53 @@ func UpdateProduct(productoIngresado string, newnameProduct string) (models.Prod
 	// Confirma la transacción
 	tx.Commit()
 
+	// Devuelve el producto actualizado
 	return producto, nil
+}
+
+func generateProductID() string {
+	// Semilla para el generador aleatorio, utilizando la hora actual para mayor unicidad
+	rand.Seed(time.Now().UnixNano())
+	randomNumber := rand.Intn(1000000) // Generar un número aleatorio de 6 dígitos
+	return fmt.Sprintf("product-%d-%d", time.Now().Unix(), randomNumber)
 }
 
 // CreateProduct crea un nuevo producto con el nombre proporcionado
 // Si el producto ya existe, devuelve un error.
-func CreateProduct(nameProduct string) (models.Product, error) {
+func CreateProduct(name string, price int, stock int, description string, category string) (models.Product, error) {
 	// Verificar si el producto ya existe en la base de datos
 	var existingProduct models.Product
-	if err := db.DB.Where("name = ?", nameProduct).First(&existingProduct).Error; err == nil {
+	if err := db.DB.Where("name = ?", name).First(&existingProduct).Error; err == nil {
 		// Si el producto ya existe, devolver un error
 		return models.Product{}, errors.New("product with the same name already exists")
 	}
 
+	// Validar los datos (opcional, pero recomendado)
+	if price <= 0 {
+		return models.Product{}, errors.New("price must be greater than zero")
+	}
+	if stock < 0 {
+		return models.Product{}, errors.New("stock cannot be negative")
+	}
+	if description == "" {
+		return models.Product{}, errors.New("description cannot be empty")
+	}
+
+	if category == "" {
+		return models.Product{}, errors.New("description cannot be empty")
+	}
+
 	// Crear un nuevo producto
 	newProduct := models.Product{
-		Name: nameProduct,
+		Name:        name,
+		Price:       price,
+		Stock:       stock,
+		Description: description,
+		Category: category,
 	}
+
+	// Generar un product_id único manualmente
+	newProduct.ProductID = generateProductID()
 
 	// Iniciar una transacción
 	tx := db.DB.Begin()
@@ -129,6 +193,7 @@ func CreateProduct(nameProduct string) (models.Product, error) {
 	// Devolver el producto creado
 	return newProduct, nil
 }
+
 
 func DeleteProductByName(nameProduct string) error {
 	// Abre una transacción
