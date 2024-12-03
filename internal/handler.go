@@ -92,6 +92,45 @@ func Handler(d amqp.Delivery, ch *amqp.Channel) {
 				}
 			}
 		}
+
+
+	case "FIND_ALL":
+		log.Println(" [.] Getting all products")
+		
+		var err error
+		var productsJson []byte
+		var products []models.Product
+		
+		// Llamar a la función para obtener todos los productos
+		products, err = controllers.GetAllProducts()
+		if err != nil {
+			// Si ocurre un error al obtener los productos
+			log.Printf("Error getting all products: %v", err)
+			response = models.Response{
+				Success: "error",
+				Message: "Error getting products",
+				Data:    []byte(err.Error()),
+			}
+		} else {
+			// Si todo está bien, devolver los productos en formato JSON
+			productsJson, err = json.Marshal(products) // Serializar los productos a JSON
+			if err != nil {
+				log.Printf("Error serializing products: %v", err)
+				response = models.Response{
+					Success: "error",
+					Message: "Error serializing products",
+					Data:    []byte(err.Error()),
+				}
+			} else {
+				// Enviar la respuesta con los productos serializados como JSON
+				response = models.Response{
+					Success: "success",
+					Message: "Products retrieved",
+					Data:    productsJson, // Enviar los datos como JSON
+				}
+			}
+		}
+	
 	
 
 	case "GET_USERBYNAME":

@@ -11,6 +11,8 @@ import (
 	"time"
 )
 
+
+
 func CreateUser(username string) (*models.User, error) {
 	// Crear un nuevo usuario sin el carrito (carrito ha sido eliminado)
 	newUser := models.User{
@@ -63,6 +65,17 @@ func GetByProductID(productID string) (models.Product, error) {
 
     // Devolver el producto encontrado
     return product, nil
+}
+
+func GetAllProducts() ([]models.Product, error) {
+	var products []models.Product
+
+	// Consulta para obtener todos los productos
+	if err := db.DB.Find(&products).Error; err != nil {
+		return nil, err
+	}
+
+	return products, nil
 }
 
 func UpdateProduct(productoIngresado string, newName string, newPrice int, newStock int, newDescription string, newCategory string) (models.Product, error) {
